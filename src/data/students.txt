@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Pedro",
+    "age": 18,
+    "classes": [
+      "Python desde cero",
+      "Excel"
+    ]
+  },
+  {
+    "name": "Pao",
+    "age": 25,
+    "classes": [
+      "Python desde cero"
+    ]
+  },
+  {
+    "name": "Espe",
+    "age": 25,
+    "classes": [
+      "Excel"
+    ]
+  }
+]
