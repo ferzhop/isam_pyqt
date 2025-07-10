@@ -3,6 +3,8 @@ from data.translator import Translator
 from .teachers_crud import TeachersCRUD
 from .classes_crud import ClassesCRUD
 from .students_crud import StudentsCRUD
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 class Dashboard(QWidget):
     def __init__(self, parent=None, translator=None):
@@ -11,8 +13,10 @@ class Dashboard(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        # Menú de idioma solo en la barra superior
         self.menu_bar = QMenuBar(self)
+        # Elimina menús previos para evitar superposición
+        self.menu_bar.clear()
+        # Crea el menú de idioma correctamente
         self.lang_menu = self.menu_bar.addMenu(self.translator.t("language"))
         self.action_es = QAction("Español", self)
         self.action_en = QAction("English", self)
@@ -49,11 +53,23 @@ class Dashboard(QWidget):
         layout.addLayout(self.content_layout)
         layout.addWidget(self.logout_btn)
         self.setLayout(layout)
+
+        self.dashboard_widget = QWidget()
+        self.dashboard_layout = QVBoxLayout(self.dashboard_widget)
+        self.dashboard_canvas = FigureCanvas(Figure(figsize=(5, 3)))
+        self.dashboard_layout.addWidget(self.dashboard_canvas)
+
         self.show_dashboard()
+
+        self.action_dashboard = QAction(self.translator.t("dashboard_title"), self)
+        self.menu_bar.addAction(self.action_dashboard)
+        self.action_dashboard.triggered.connect(self.show_dashboard)
 
     def show_dashboard(self):
         self.clear_content()
+        self.update_dashboard_charts()
         self.content_layout.addWidget(self.title)
+        self.content_layout.addWidget(self.dashboard_widget)
 
     def show_classes(self):
         self.clear_content()
@@ -74,6 +90,44 @@ class Dashboard(QWidget):
                 self.content_layout.removeWidget(widget)
                 widget.setParent(None)
 
+    def update_dashboard_charts(self):
+        from data.storage import DBStorage
+        db = DBStorage()
+        classes = db.get_classes()
+        students = db.get_students()
+        # 1. Porcentaje de alumnos por clase
+        class_names = [c['name'] for c in classes]
+        class_counts = []
+        total_students = len(students)
+        for c in classes:
+            count = 0
+            for s in students:
+                student_classes = db.get_student_classes(s['id'])
+                if any(sc['id'] == c['id'] for sc in student_classes):
+                    count += 1
+            class_counts.append(count)
+        # 2. Clases con profesor asignado
+        prof_labels = [self.translator.t('with_teacher'), self.translator.t('without_teacher')]
+        with_prof = sum(1 for c in classes if c['teacher'])
+        without_prof = len(classes) - with_prof
+        prof_counts = [with_prof, without_prof]
+        # Graficar
+        fig = self.dashboard_canvas.figure
+        fig.clear()
+        ax1 = fig.add_subplot(121)
+        if class_names:
+            ax1.pie(class_counts, labels=class_names, autopct=lambda p: f'{p:.0f}%\n({int(p*total_students/100)})' if total_students else '0', startangle=90)
+            ax1.set_title(self.translator.t('students_per_class'))
+        else:
+            ax1.text(0.5, 0.5, self.translator.t('no_classes'), ha='center', va='center')
+        ax2 = fig.add_subplot(122)
+        ax2.bar(prof_labels, prof_counts, color=['#1976d2', '#b0bec5'])
+        ax2.set_title(self.translator.t('classes_with_teacher'))
+        for i, v in enumerate(prof_counts):
+            ax2.text(i, v + 0.1, str(v), ha='center')
+        fig.tight_layout()
+        self.dashboard_canvas.draw()
+
     def set_language(self, lang):
         self.translator.load_language(lang)
         self.lang_menu.setTitle(self.translator.t("language"))
@@ -82,6 +136,8 @@ class Dashboard(QWidget):
         self.students_btn.setText(self.translator.t("students"))
         self.teachers_btn.setText(self.translator.t("teachers"))
         self.logout_btn.setText(self.translator.t("logout"))
+        self.action_dashboard.setText(self.translator.t("dashboard_title"))
+        self.update_dashboard_charts()
         # Propagar idioma a los CRUDs
         self.teachers_crud.set_language(lang)
         self.classes_crud.set_language(lang)

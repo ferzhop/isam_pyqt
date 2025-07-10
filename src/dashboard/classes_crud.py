@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDialog, QLabel, QLineEdit, QFormLayout, QComboBox)
 from PyQt5.QtCore import Qt
-from data.storage import SimpleStorage
+from data.storage import DBStorage
 from data.translator import Translator
 import os
 
@@ -8,9 +8,8 @@ class ClassesCRUD(QWidget):
     def __init__(self, parent=None, teachers_ref=None, translator=None):
         super().__init__(parent)
         self.translator = translator or Translator("es")
-        self.storage = SimpleStorage(os.path.join(os.path.dirname(__file__), '../data/classes.txt'))
-        self.classes = self.storage.load()
-        self.teachers_ref = teachers_ref  # Referencia a lista de profesores
+        self.db = DBStorage()
+        self.teachers_ref = teachers_ref
         self.init_ui()
     def init_ui(self):
         layout = QVBoxLayout()
@@ -28,16 +27,16 @@ class ClassesCRUD(QWidget):
         self.setLayout(layout)
         self.refresh_table()
     def refresh_table(self):
-        self.classes = self.storage.load()
+        classes = self.db.get_classes()
         self.table.setRowCount(0)
-        for idx, c in enumerate(self.classes):
+        for idx, c in enumerate(classes):
             self.table.insertRow(idx)
             self.table.setItem(idx, 0, QTableWidgetItem(c["name"]))
             self.table.setItem(idx, 1, QTableWidgetItem(c["teacher"]))
             edit_btn = QPushButton(self.translator.t("edit"))
             delete_btn = QPushButton(self.translator.t("delete"))
-            edit_btn.clicked.connect(lambda _, i=idx: self.edit_class(i))
-            delete_btn.clicked.connect(lambda _, i=idx: self.delete_class(i))
+            edit_btn.clicked.connect(lambda _, i=c["id"]: self.edit_class(i))
+            delete_btn.clicked.connect(lambda _, i=c["id"]: self.delete_class(i))
             container = QWidget()
             hlayout = QHBoxLayout(container)
             hlayout.addWidget(edit_btn)
@@ -46,23 +45,29 @@ class ClassesCRUD(QWidget):
             hlayout.setSpacing(4)
             self.table.setCellWidget(idx, 2, container)
     def add_class(self):
-        dialog = ClassFormDialog(self, self.teachers_ref, None)
+        teachers = self.db.get_teachers()
+        dialog = ClassFormDialog(self, teachers, None)
         if dialog.exec_():
             data = dialog.get_data()
-            self.classes.append(data)
-            self.storage.save(self.classes)
+            teacher_id = next((t["id"] for t in teachers if t["name"] == data["teacher"]), None)
+            self.db.add_class(data["name"], teacher_id)
             self.refresh_table()
-    def edit_class(self, idx):
-        dialog = ClassFormDialog(self, self.teachers_ref, self.classes[idx])
+    def edit_class(self, class_id):
+        classes = self.db.get_classes()
+        teachers = self.db.get_teachers()
+        class_data = next((c for c in classes if c["id"] == class_id), None)
+        if not class_data:
+            return
+        dialog = ClassFormDialog(self, teachers, class_data)
         if dialog.exec_():
-            self.classes[idx] = dialog.get_data()
-            self.storage.save(self.classes)
+            data = dialog.get_data()
+            teacher_id = next((t["id"] for t in teachers if t["name"] == data["teacher"]), None)
+            self.db.update_class(class_id, data["name"], teacher_id)
             self.refresh_table()
-    def delete_class(self, idx):
-        confirm = QMessageBox.question(self, "Eliminar", "¿Eliminar esta clase?", QMessageBox.Yes | QMessageBox.No)
+    def delete_class(self, class_id):
+        confirm = QMessageBox.question(self, self.translator.t("delete"), self.translator.t("delete")+"?", QMessageBox.Yes | QMessageBox.No)
         if confirm == QMessageBox.Yes:
-            self.classes.pop(idx)
-            self.storage.save(self.classes)
+            self.db.delete_class(class_id)
             self.refresh_table()
     def set_language(self, lang):
         self.translator.load_language(lang)
@@ -75,16 +80,15 @@ class ClassesCRUD(QWidget):
         self.refresh_table()
 
 class ClassFormDialog(QDialog):
-    def __init__(self, parent=None, teachers_ref=None, class_data=None):
+    def __init__(self, parent=None, teachers=None, class_data=None):
         super().__init__(parent)
         self.translator = getattr(parent, 'translator', None)
         self.setWindowTitle(self.tr_text("register_class", "Registrar/Editar Clase"))
         self.class_data = class_data
-        self.teachers_ref = teachers_ref
+        self.teachers = teachers or []
         self.name_input = QLineEdit()
         self.teacher_combo = QComboBox()
-        if teachers_ref:
-            self.teacher_combo.addItems([t["name"] for t in teachers_ref.teachers])
+        self.teacher_combo.addItems([t["name"] for t in self.teachers])
         form = QFormLayout()
         form.addRow(self.tr_text("class_name", "Nombre de la clase"), self.name_input)
         form.addRow(self.tr_text("class_teacher", "Profesor"), self.teacher_combo)

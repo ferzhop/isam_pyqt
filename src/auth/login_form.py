@@ -58,9 +58,12 @@ class LoginForm(QWidget):
         self.setLayout(main_layout)
 
     def handle_login(self):
+        from data.storage import DBStorage
         username = self.user_input.text()
         password = self.pass_input.text()
-        if username == "ISAM" and password == "Am3l1a":
+        db = DBStorage()
+        db.create_admin_user()  # Asegura que el admin exista
+        if db.verify_user(username, password):
             token = AuthManager.generate_token(username)
             self.login_successful.emit(token)
         else:

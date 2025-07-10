@@ -26,5 +26,10 @@
     "action": "Action",
     "save": "Save",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "students_per_class": "Students per class",
+    "no_classes": "No classes",
+    "classes_with_teacher": "Classes with teacher",
+    "with_teacher": "With teacher",
+    "without_teacher": "Without teacher"
 }

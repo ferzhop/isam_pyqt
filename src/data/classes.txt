@@ -1,14 +1,1 @@
-[
-  {
-    "name": "Python desde cero",
-    "teacher": "Fernando"
-  },
-  {
-    "name": "Excel",
-    "teacher": "Amelia"
-  },
-  {
-    "name": "Prueba",
-    "teacher": "fdgfd"
-  }
-]
+[]

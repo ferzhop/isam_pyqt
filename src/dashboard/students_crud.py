@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDialog, QLabel, QLineEdit, QFormLayout, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView)
 from PyQt5.QtCore import Qt
-from data.storage import SimpleStorage
+from data.storage import DBStorage
 from data.translator import Translator
 import os
 
@@ -8,9 +8,7 @@ class StudentsCRUD(QWidget):
     def __init__(self, parent=None, classes_ref=None, translator=None):
         super().__init__(parent)
         self.translator = translator or Translator("es")
-        self.storage = SimpleStorage(os.path.join(os.path.dirname(__file__), '../data/students.txt'))
-        self.students = self.storage.load()
-        self.classes_ref = classes_ref
+        self.db = DBStorage()
         self.init_ui()
     def init_ui(self):
         layout = QVBoxLayout()
@@ -29,17 +27,21 @@ class StudentsCRUD(QWidget):
         self.setLayout(layout)
         self.refresh_table()
     def refresh_table(self):
-        self.students = self.storage.load()
+        students = self.db.get_students()
+        classes = self.db.get_classes()
         self.table.setRowCount(0)
-        for idx, s in enumerate(self.students):
+        for idx, s in enumerate(students):
             self.table.insertRow(idx)
             self.table.setItem(idx, 0, QTableWidgetItem(s["name"]))
             self.table.setItem(idx, 1, QTableWidgetItem(str(s["age"])))
-            self.table.setItem(idx, 2, QTableWidgetItem(", ".join(s["classes"])))
+            # Obtener nombres de clases asociadas
+            student_classes = self.db.get_student_classes(s["id"])
+            class_names = [c["name"] for c in student_classes]
+            self.table.setItem(idx, 2, QTableWidgetItem(", ".join(class_names)))
             edit_btn = QPushButton(self.translator.t("edit"))
             delete_btn = QPushButton(self.translator.t("delete"))
-            edit_btn.clicked.connect(lambda _, i=idx: self.edit_student(i))
-            delete_btn.clicked.connect(lambda _, i=idx: self.delete_student(i))
+            edit_btn.clicked.connect(lambda _, i=s["id"]: self.edit_student(i))
+            delete_btn.clicked.connect(lambda _, i=s["id"]: self.delete_student(i))
             container = QWidget()
             hlayout = QHBoxLayout(container)
             hlayout.addWidget(edit_btn)
@@ -48,23 +50,36 @@ class StudentsCRUD(QWidget):
             hlayout.setSpacing(4)
             self.table.setCellWidget(idx, 3, container)
     def add_student(self):
-        dialog = StudentFormDialog(self, self.classes_ref, None)
+        classes = self.db.get_classes()
+        dialog = StudentFormDialog(self, classes, None)
         if dialog.exec_():
             data = dialog.get_data()
-            self.students.append(data)
-            self.storage.save(self.students)
+            student_id = self.db.add_student(data["name"], data["age"])
+            # Guardar relación alumno-clase
+            class_ids = [c["id"] for c in classes if c["name"] in data["classes"]]
+            self.db.set_student_classes(student_id, class_ids)
             self.refresh_table()
-    def edit_student(self, idx):
-        dialog = StudentFormDialog(self, self.classes_ref, self.students[idx])
+    def edit_student(self, student_id):
+        students = self.db.get_students()
+        student = next((s for s in students if s["id"] == student_id), None)
+        if not student:
+            return
+        classes = self.db.get_classes()
+        # Obtener clases asociadas
+        student_classes = self.db.get_student_classes(student_id)
+        class_names = [c["name"] for c in student_classes]
+        student_data = {"name": student["name"], "age": student["age"], "classes": class_names}
+        dialog = StudentFormDialog(self, classes, student_data)
         if dialog.exec_():
-            self.students[idx] = dialog.get_data()
-            self.storage.save(self.students)
+            data = dialog.get_data()
+            self.db.update_student(student_id, data["name"], data["age"])
+            class_ids = [c["id"] for c in classes if c["name"] in data["classes"]]
+            self.db.set_student_classes(student_id, class_ids)
             self.refresh_table()
-    def delete_student(self, idx):
-        confirm = QMessageBox.question(self, "Eliminar", "¿Eliminar este alumno?", QMessageBox.Yes | QMessageBox.No)
+    def delete_student(self, student_id):
+        confirm = QMessageBox.question(self, self.translator.t("delete"), self.translator.t("delete")+"?", QMessageBox.Yes | QMessageBox.No)
         if confirm == QMessageBox.Yes:
-            self.students.pop(idx)
-            self.storage.save(self.students)
+            self.db.delete_student(student_id)
             self.refresh_table()
     def set_language(self, lang):
         self.translator.load_language(lang)
@@ -78,20 +93,19 @@ class StudentsCRUD(QWidget):
         self.refresh_table()
 
 class StudentFormDialog(QDialog):
-    def __init__(self, parent=None, classes_ref=None, student_data=None):
+    def __init__(self, parent=None, classes=None, student_data=None):
         super().__init__(parent)
         self.translator = getattr(parent, 'translator', None)
         self.setWindowTitle(self.tr_text("register_student", "Registrar/Editar Alumno"))
         self.student_data = student_data
-        self.classes_ref = classes_ref
+        self.classes = classes or []
         self.name_input = QLineEdit()
         self.age_input = QLineEdit()
         self.classes_list = QListWidget()
         self.classes_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        if classes_ref:
-            for c in classes_ref.classes:
-                item = QListWidgetItem(c["name"])
-                self.classes_list.addItem(item)
+        for c in self.classes:
+            item = QListWidgetItem(c["name"])
+            self.classes_list.addItem(item)
         form = QFormLayout()
         form.addRow(self.tr_text("student_name", "Nombre del alumno"), self.name_input)
         form.addRow(self.tr_text("student_age", "Edad"), self.age_input)

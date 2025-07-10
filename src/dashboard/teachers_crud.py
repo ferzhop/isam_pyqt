@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDialog, QLabel, QLineEdit, QFormLayout, QComboBox, QMenuBar, QAction)
 from PyQt5.QtCore import Qt
-from data.storage import SimpleStorage
+from data.storage import DBStorage
 from data.translator import Translator
 import os
 
@@ -8,8 +8,7 @@ class TeachersCRUD(QWidget):
     def __init__(self, parent=None, translator=None):
         super().__init__(parent)
         self.translator = translator or Translator("es")
-        self.storage = SimpleStorage(os.path.join(os.path.dirname(__file__), '../data/teachers.txt'))
-        self.teachers = self.storage.load()
+        self.db = DBStorage()
         self.init_ui()
     def init_ui(self):
         layout = QVBoxLayout()
@@ -27,16 +26,16 @@ class TeachersCRUD(QWidget):
         self.setLayout(layout)
         self.refresh_table()
     def refresh_table(self):
-        self.teachers = self.storage.load()
+        teachers = self.db.get_teachers()
         self.table.setRowCount(0)
-        for idx, t in enumerate(self.teachers):
+        for idx, t in enumerate(teachers):
             self.table.insertRow(idx)
             self.table.setItem(idx, 0, QTableWidgetItem(t["name"]))
             self.table.setItem(idx, 1, QTableWidgetItem(t["subject"]))
             edit_btn = QPushButton(self.translator.t("edit"))
             delete_btn = QPushButton(self.translator.t("delete"))
-            edit_btn.clicked.connect(lambda _, i=idx: self.edit_teacher(i))
-            delete_btn.clicked.connect(lambda _, i=idx: self.delete_teacher(i))
+            edit_btn.clicked.connect(lambda _, i=t["id"]: self.edit_teacher(i))
+            delete_btn.clicked.connect(lambda _, i=t["id"]: self.delete_teacher(i))
             container = QWidget()
             hlayout = QHBoxLayout(container)
             hlayout.addWidget(edit_btn)
@@ -48,20 +47,22 @@ class TeachersCRUD(QWidget):
         dialog = TeacherFormDialog(self)
         if dialog.exec_():
             data = dialog.get_data()
-            self.teachers.append(data)
-            self.storage.save(self.teachers)
+            self.db.add_teacher(data["name"], data["subject"])
             self.refresh_table()
-    def edit_teacher(self, idx):
-        dialog = TeacherFormDialog(self, self.teachers[idx])
+    def edit_teacher(self, teacher_id):
+        teachers = self.db.get_teachers()
+        teacher = next((t for t in teachers if t["id"] == teacher_id), None)
+        if not teacher:
+            return
+        dialog = TeacherFormDialog(self, teacher)
         if dialog.exec_():
-            self.teachers[idx] = dialog.get_data()
-            self.storage.save(self.teachers)
+            data = dialog.get_data()
+            self.db.update_teacher(teacher_id, data["name"], data["subject"])
             self.refresh_table()
-    def delete_teacher(self, idx):
-        confirm = QMessageBox.question(self, "Eliminar", "¿Eliminar este profesor?", QMessageBox.Yes | QMessageBox.No)
+    def delete_teacher(self, teacher_id):
+        confirm = QMessageBox.question(self, self.translator.t("delete"), self.translator.t("delete")+"?", QMessageBox.Yes | QMessageBox.No)
         if confirm == QMessageBox.Yes:
-            self.teachers.pop(idx)
-            self.storage.save(self.teachers)
+            self.db.delete_teacher(teacher_id)
             self.refresh_table()
     def set_language(self, lang):
         self.translator.load_language(lang)
