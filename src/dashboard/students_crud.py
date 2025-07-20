@@ -23,6 +23,8 @@ class StudentsCRUD(QWidget):
             self.translator.t("action")
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # Deshabilitar edición directa en la tabla
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         layout.addWidget(self.table)
         self.setLayout(layout)
         self.refresh_table()

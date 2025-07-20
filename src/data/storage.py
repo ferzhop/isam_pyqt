@@ -127,3 +127,24 @@ class DBStorage:
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         c.execute('SELECT * FROM users WHERE username=? AND password=?', (username, password_hash))
         return c.fetchone() is not None
+    def ensure_users_table(self):
+        c = self.conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            email TEXT,
+            is_confirmed INTEGER DEFAULT 0,
+            token TEXT,
+            token_expiry INTEGER
+        )''')
+        # Si la tabla existe pero no tiene la columna email o is_confirmed, las agregamos (sin restricciones)
+        try:
+            c.execute('SELECT email FROM users LIMIT 1')
+        except sqlite3.OperationalError:
+            c.execute('ALTER TABLE users ADD COLUMN email TEXT')
+        try:
+            c.execute('SELECT is_confirmed FROM users LIMIT 1')
+        except sqlite3.OperationalError:
+            c.execute('ALTER TABLE users ADD COLUMN is_confirmed INTEGER DEFAULT 0')
+        self.conn.commit()

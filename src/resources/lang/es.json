@@ -31,5 +31,8 @@
     "no_classes": "Sin clases",
     "classes_with_teacher": "Clases con profesor",
     "with_teacher": "Con profesor",
-    "without_teacher": "Sin profesor"
+    "without_teacher": "Sin profesor",
+    "email": "Correo electrónico",
+    "confirm_token": "Código de confirmación",
+    "confirm": "Confirmar"
 }

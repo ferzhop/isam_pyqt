@@ -34,6 +34,14 @@ class LoginForm(QWidget):
         self.logo_label.setFixedHeight(120)
         self.logo_label.setScaledContents(True)
 
+        # Link a registro
+        self.register_label = QLabel(f'<a href="#">{self.translator.t("register")}</a>')
+        self.register_label.setStyleSheet('color: #1976d2; text-align: center;')
+        self.register_label.setTextFormat(Qt.RichText)
+        self.register_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.register_label.setOpenExternalLinks(False)
+        self.register_label.linkActivated.connect(self.go_to_register)
+
         # Centrar el formulario
         form_layout = QVBoxLayout()
         form_layout.addWidget(self.logo_label)
@@ -43,6 +51,7 @@ class LoginForm(QWidget):
         form_layout.addWidget(self.pass_label)
         form_layout.addWidget(self.pass_input)
         form_layout.addWidget(self.login_btn)
+        form_layout.addWidget(self.register_label)
         form_layout.setAlignment(self.logo_label, Qt.AlignHCenter)
         form_layout.setAlignment(self.login_btn, Qt.AlignHCenter)
         form_layout.setSpacing(12)
@@ -75,3 +84,9 @@ class LoginForm(QWidget):
         self.user_label.setText(self.translator.t("username"))
         self.pass_label.setText(self.translator.t("password"))
         self.login_btn.setText(self.translator.t("login"))
+
+    def go_to_register(self):
+        if self.parent() and hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'stacked_widget'):
+            self.parent().parent().stacked_widget.setCurrentIndex(1)
+        elif self.parent() and hasattr(self.parent(), 'stacked_widget'):
+            self.parent().stacked_widget.setCurrentIndex(1)

@@ -1,0 +1,6 @@
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+
+# Base de datos local
+src/data/isam.db
