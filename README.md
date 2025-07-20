@@ -21,6 +21,8 @@ Esta es una aplicación de escritorio desarrollada en Python con PyQt5 para la g
 - PyQt5
 - PyJWT
 - matplotlib
+- email (incluido en la librería estándar de Python)
+- smtplib (incluido en la librería estándar de Python)
 
 ## Instalación
 1. Instala las dependencias:
@@ -28,6 +30,7 @@ Esta es una aplicación de escritorio desarrollada en Python con PyQt5 para la g
    pip install -r requirements.txt
    pip install matplotlib
    ```
+   > **Nota:** No es necesario instalar nada extra para SMTP, ya que `smtplib` y `email` vienen con Python estándar.
 2. Ejecuta la aplicación:
    ```bash
    python src/main.py
